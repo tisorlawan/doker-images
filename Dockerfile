@@ -1,36 +1,37 @@
 FROM nvcr.io/nvidia/pytorch:22.12-py3
 
-RUN apt-get update && apt-get install --no-install-recommends -y  locales curl xz-utils vim  ca-certificates && apt-get clean && rm -rf /var/lib/apt/lists/* \
-      && mkdir -m 0755 /nix && groupadd -r nixbld && chown root /nix \
-      && for n in $(seq 1 10); do useradd -c "Nix build user $n" -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(command -v nologin)" "nixbld$n"; done
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN set -o pipefail && curl -L https://nixos.org/nix/install | bash
-
-# Create the tiso user
 RUN groupadd -g 1000 ubuntu && \
     useradd -m -u 1000 -g 1000 -s /bin/bash ubuntu
-
-# Set up the home directory
 RUN chown -R ubuntu:ubuntu /home/ubuntu
 
-# Install any additional packages if needed
-# RUN apt-get update && apt-get install -y package-name
+RUN mkdir /tmp/extra
+RUN cd /tmp/extra
+RUN wget -L 'https://gitlab.com/proot/proot/-/jobs/2370229669/artifacts/raw/public/bin/proot?inline=false' -O proot
+RUN chmod +x proot
+RUN mv proot /usr/local/bin
+RUN rm -r /tmp/extra
 
 # Set the working directory
 WORKDIR /home/ubuntu
 
-RUN cp -r /root/.nix-profile /home/ubuntu/.nix-profile
-RUN chown -R ubuntu:ubuntu /home/ubuntu/.nix-profile
-RUN source /home/ubuntu/.nix-profile/etc/profile.d/nix.sh
-ENV PATH="/home/ubuntu/.nix-profile/bin:$PATH"
-
-RUN chmod 755 /nix/var/nix/profiles/per-user
-RUN chown -R ubuntu:ubuntu /nix/var/nix/profiles/per-user
-RUN chmod 755 /nix/var/nix/gcroots/per-user
-RUN chown -R ubuntu:ubuntu /nix/var/nix/gcroots/per-user
-
 # Switch to the ubuntu user
 USER ubuntu
+
+ENV PATH="/home/ubuntu/.nix-profile/bin:$PATH"
+
+RUN mkdir -p /home/ubuntu/.nix && \
+    proot -b /home/ubuntu/.nix:/nix /bin/sh -c 'curl -L https://nixos.org/nix/install | sh -s -- --no-daemon'
+
+RUN proot -b ~/.nix:/nix /bin/sh -c 'nix-channel --add https://nixos.org/channels/nixos-24.05 nixpkgs'
+RUN proot -b ~/.nix:/nix /bin/sh -c 'nix-channel --add https://nixos.org/channels/nixos-unstable unstable'
+RUN proot -b ~/.nix:/nix /bin/sh -c 'nix-channel --update'
+RUN proot -b ~/.nix:/nix /bin/sh -c 'nix-env -iA unstable.neovim nixpkgs.tmux nixpkgs.yazi nixpkgs.starship nixpkgs.fzf nixpkgs.ripgrep nixpkgs.fd nixpkgs.zoxide nixpkgs.fish nixpkgs.eza nixpkgs.bat nixpkgs.dust'
+
+
+RUN echo "alias pp='proot -b ~/.nix:/nix'" >>~/.bashrc
+RUN echo "alias f='proot -b ~/.nix:/nix sh -c fish'" >>~/.bashrc
+
+# RUN source /home/ubuntu/.nix-profile/etc/profile.d/nix.sh
 
 # Set the default command
 CMD ["sleep", "infinity"]
