@@ -13,13 +13,25 @@ RUN rm -r /tmp/extra
 
 # Set the working directory
 WORKDIR /home/ubuntu
+ENV HOME=/home/ubuntu
 
 # Switch to the ubuntu user
 USER ubuntu
 
-# ENV PATH="/home/ubuntu/.nix-profile/bin:$PATH"
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
+RUN echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
+ENV PATH="$HOME/.cargo/bin:${PATH}"
+RUN ~/.cargo/bin/cargo install nix-user-chroot
+RUN mkdir -m 0755 ~/.nix
+# RUN ~/.cargo/bin/nix-user-chroot ~/.nix bash -c 'curl -L https://nixos.org/nix/install | sh'
 
-RUN mkdir -p /home/ubuntu/.nix
+# # ENV PATH="/home/ubuntu/.nix-profile/bin:$PATH"
+#
+# RUN mkdir -p ~/.config/nix
+# RUN echo 'sandbox = false' > ~/.config/nix/nix.conf
+
+# RUN mkdir -p ~/.nix
+
 # RUN proot -b /home/ubuntu/.nix:/nix /bin/sh -c 'curl -L https://nixos.org/nix/install | sh -s -- --no-daemon'
 #
 # RUN proot -b ~/.nix:/nix /bin/sh -c 'nix-channel --add https://nixos.org/channels/nixos-24.05 nixpkgs'
